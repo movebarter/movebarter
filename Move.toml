@@ -1,0 +1,15 @@
+[package]
+name = 'movebarter'
+version = '1.0.0'
+[dependencies.AptosFramework]
+git = 'https://github.com/aptos-labs/aptos-core.git'
+rev = 'mainnet'
+subdir = 'aptos-move/framework/aptos-framework'
+
+[dependencies.AptosToken]
+git = 'https://github.com/aptos-labs/aptos-core.git'
+rev = 'mainnet'
+subdir = 'aptos-move/framework/aptos-token'
+
+[addresses]
+myAccount = "0xe7353d6d311924517f5e82171cb87245c8200d0a17eee4b76b7c2dbf28a95854"
