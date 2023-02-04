@@ -3,17 +3,11 @@
 Movebarter是一个基于SUI的物品交换平台，用户可以在该平台上进行相同/不同种类物品的交易，如：
 * 同种nft交易(水浒英雄卡，宋江换武松)
 * 不同种类nft交易(用BAYC换CryptoPunks)
-* 混合交易(用BAYC + 一些ETH换CryptoPunks)
-* [半同质化TOKEN](https://www.binance.com/zh-CN/news/top/7194322)(SFT)交易
-* 自动撮合交易
 
 ## 模块拆分
 项目主要分为两个模块，NFT & 订单。
 * NFT模块提供了记录物品的基本信息并在不同账户间转移的功能。主要分为: 创建NFT、发行NFT、展示NFT
 * 订单记录了被交易物品的id信息。主要分为: 创建订单、购买、取消订单
-
-## Milestone
-* 待定
 
 ## 技术栈
 * 前端: React + HardHat
