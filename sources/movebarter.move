@@ -1,59 +1,95 @@
-module myAccount::movebarter {
-  use aptos_token::token;
-  use std::string::{Self, String};
-  use aptos_token::token::{TokenId, TokenDataId};
-  use aptos_token::property_map::{Self, PropertyMap, PropertyValue};
-  use aptos_framework::account::{SignerCapability, create_resource_account};
-  use aptos_framework::account;
-  use std::vector;
-  use aptos_framework::timestamp;
-  use std::signer::address_of;
-  #[test_only]
-  use aptos_framework::account::create_account_for_test;
-  use aptos_framework::coin;
-  #[test_only]
-  use aptos_framework::aptos_coin;
-  use aptos_framework::aptos_coin::AptosCoin;
-  use aptos_std::simple_map::{Self, SimpleMap};
+module movebarter::exchange {
   use std::option::{Self, Option};
+  use sui::object::{Self, ID, UID};
+  use sui::transfer;
+  use sui::tx_context::{Self, TxContext};
 
-  struct Order has store {
-    base_token_id: TokenId,
-    target_token_id: Option<TokenId>,
-    target_propert_map: PropertyMap,
+  const ENftIdNotMatch: u64 = 1;
+  const ENftPropertyNotMatch: u64 = 2;
+
+  // we can get all nfts from one address
+  // sui client objects
+  // sui client object [object id]
+  struct Nft has key, store {
+      id: UID,
+      name: vector<u8>,
+      description: vector<u8>,
+      property_value: vector<u8>,
   }
 
-  struct Orders has key{
-    orders: SimpleMap<u64, Order>,
-    //events: OrderEvents,
-    next_order_id: u64,
+  struct Order has key, store {
+    id: UID,
+    base_token: Nft,
+    target_token_id: Option<ID>,
+    target_property_value: Option<vector<u8>>,
+    owner: address,
   }
 
-  public entry fun init(
-    _sender:&signer, 
-    _maximum:u64, 
-    _expiration_timestamp:u64){
+  fun init(
+    ctx: &mut TxContext
+    ){
   }
 
   public entry fun mint(
-    _sender:&signer, 
-    name: String,
-    description: String, 
-    property_keys: vector<String>,
-    property_values: vector<vector<u8>>,
-    property_types: vector<String>) {
+    name: vector<u8>,
+    description: vector<u8>, 
+    property_values: vector<u8>,
+    ctx: &mut TxContext,
+    ) {
   }
 
-  public entry fun submit_order(_sender:&signer) {
+  public entry fun submit_order(
+    base_token: Nft,
+    target_token_id: Option<ID>,
+    target_property_value: Option<vector<u8>>,
+    maintainer: address,
+    ctx: &mut TxContext) {
+
+      let order = Order{
+        id: object::new(ctx), 
+        base_token, 
+        target_token_id, 
+        target_property_value, 
+        owner: tx_context::sender(ctx)
+      };
+      transfer::transfer(order, maintainer);
   }
 
   public entry fun take_order(
-    _sender:&signer, 
-    token_id:TokenId) {
+    nft: Nft,
+    order: Order,
+    ctx: &mut TxContext
+    ) {
+      let Order { id, base_token, target_token_id, target_property_value, owner} = order;
+
+      if (option::is_some(&target_token_id)) {
+        let inter_nft_id = object::uid_to_inner(&nft.id);
+        assert!(option::borrow(&target_token_id) == &inter_nft_id, ENftIdNotMatch);
+      };
+
+      if (option::is_some(&target_property_value)) {
+        let inter_nft_property_value = nft.property_value;
+        assert!(option::borrow(&target_property_value) == &inter_nft_property_value, ENftPropertyNotMatch);
+      }; 
+
+      transfer::transfer(nft, owner);
+      transfer::transfer(base_token, owner);
+
+      object::delete(id);
+      option::destroy_none(target_token_id);
+      option::destroy_none(target_property_value);
   }
 
   public entry fun cancel_order(
-    _sender:&signer, 
-    _order_id: u64) {
+    order: Order,
+    ctx: &mut TxContext
+    ) {
+      let Order { id, base_token, target_token_id, target_property_value, owner} = order;
+
+      object::delete(id);
+      option::destroy_none(target_token_id);
+      option::destroy_none(target_property_value);
+
+      transfer::transfer(base_token, owner);
   }
 }
