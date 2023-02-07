@@ -1,8 +1,9 @@
 module movebarter::exchange {
   use std::option::{Self, Option};
   use sui::object::{Self, ID, UID};
-  use sui::transfer;
+  use sui::transfer::{transfer, share_object};
   use sui::tx_context::{Self, TxContext};
+  use sui::object_table::{Self, ObjectTable};
 
   const ENftIdNotMatch: u64 = 1;
   const ENftPropertyNotMatch: u64 = 2;
@@ -26,9 +27,18 @@ module movebarter::exchange {
     owner: address,
   }
 
+  struct Global has key {
+    id: UID,
+    orders: ObjectTable<ID, Order>,
+  }
+
   fun init(
-    _ctx: &mut TxContext
+    ctx: &mut TxContext
     ){
+      share_object(Global {
+            id: object::new(ctx),
+            orders: object_table::new(ctx),
+      });
   }
 
   public entry fun mint(
@@ -44,32 +54,34 @@ module movebarter::exchange {
         property_value, 
       };
 
-      transfer::transfer(nft, tx_context::sender(ctx));
+      transfer(nft, tx_context::sender(ctx));
   }
 
   public entry fun submit_order(
+    global: &mut Global,
     base_token: Nft,
     target_token_id: Option<ID>,
     target_property_value: Option<vector<u8>>,
-    maintainer: address,
     ctx: &mut TxContext) {
 
       let order = Order{
-        id: object::new(ctx), 
+        id: object::new(ctx),
         base_token, 
         target_token_id, 
         target_property_value, 
         owner: tx_context::sender(ctx)
       };
-      transfer::transfer(order, maintainer);
+      object_table::add(&mut global.orders, object::id(&order), order);
   }
 
   public entry fun take_order(
+    global: &mut Global,
     nft: Nft,
-    order: Order,
+    oid: ID,
     ctx: &mut TxContext
     ) {
-      let Order { id, base_token, target_token_id, target_property_value, owner} = order;
+      //let Order { id, base_token, target_token_id, target_property_value, owner} = order;
+      let Order {id, base_token, target_token_id, target_property_value, owner } = object_table::remove(&mut global.orders, oid);
 
       if (option::is_some(&target_token_id)) {
         let inter_nft_id = object::uid_to_inner(&nft.id);
@@ -81,8 +93,8 @@ module movebarter::exchange {
         assert!(option::borrow(&target_property_value) == &inter_nft_property_value, ENftPropertyNotMatch);
       }; 
 
-      transfer::transfer(nft, owner);
-      transfer::transfer(base_token, tx_context::sender(ctx));
+      transfer(nft, owner);
+      transfer(base_token, tx_context::sender(ctx));
 
       object::delete(id);
       option::destroy_none(target_token_id);
@@ -90,10 +102,12 @@ module movebarter::exchange {
   }
 
   public entry fun cancel_order(
-    order: Order,
+    global: &mut Global,
+    oid: ID,
     ctx: &mut TxContext
     ) {
-      let Order { id, base_token, target_token_id, target_property_value, owner} = order;
+      //let Order { id, base_token, target_token_id, target_property_value, owner} = order;
+      let Order {id, base_token, target_token_id, target_property_value, owner } = object_table::remove(&mut global.orders, oid);
 
       let user = tx_context::sender(ctx);
       assert!(&user == &owner, ENotOrderOwner);
@@ -102,6 +116,6 @@ module movebarter::exchange {
       option::destroy_none(target_token_id);
       option::destroy_none(target_property_value);
 
-      transfer::transfer(base_token, owner);
+      transfer(base_token, owner);
   }
 }
