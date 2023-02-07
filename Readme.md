@@ -16,3 +16,7 @@ Movebarter是一个基于SUI的物品交换平台，用户可以在该平台上�
 1. [基于eth的物物交换平台论文](https://www.readcube.com/articles/10.5195/ledger.2020.148)
 2. [基于eth的物物交换平台](https://www.bartermachine.org/bloxberg/)
 3. [Centrifuge协议](https://www.jinse.com/news/blockchain/1088309.html)
+
+## 编译发布
+sui move build
+sui client publish . --gas-budget 300000

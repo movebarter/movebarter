@@ -6,5 +6,5 @@ version = "0.0.1"
 Sui = { local = "../sui/crates/sui-framework"}
 
 [addresses]
-movebarter =  "0x78c01c7fcccd6804c8af5105dbddc2033f15630b"
+movebarter =  "0x0"
 sui =  "0000000000000000000000000000000000000002"

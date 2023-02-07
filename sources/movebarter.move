@@ -6,6 +6,7 @@ module movebarter::exchange {
 
   const ENftIdNotMatch: u64 = 1;
   const ENftPropertyNotMatch: u64 = 2;
+  const ENotOrderOwner: u64 = 3;
 
   // we can get all nfts from one address
   // sui client objects
@@ -26,16 +27,24 @@ module movebarter::exchange {
   }
 
   fun init(
-    ctx: &mut TxContext
+    _ctx: &mut TxContext
     ){
   }
 
   public entry fun mint(
     name: vector<u8>,
     description: vector<u8>, 
-    property_values: vector<u8>,
+    property_value: vector<u8>,
     ctx: &mut TxContext,
     ) {
+      let nft = Nft {
+        id: object::new(ctx), 
+        name, 
+        description, 
+        property_value, 
+      };
+
+      transfer::transfer(nft, tx_context::sender(ctx));
   }
 
   public entry fun submit_order(
@@ -73,7 +82,7 @@ module movebarter::exchange {
       }; 
 
       transfer::transfer(nft, owner);
-      transfer::transfer(base_token, owner);
+      transfer::transfer(base_token, tx_context::sender(ctx));
 
       object::delete(id);
       option::destroy_none(target_token_id);
@@ -85,6 +94,9 @@ module movebarter::exchange {
     ctx: &mut TxContext
     ) {
       let Order { id, base_token, target_token_id, target_property_value, owner} = order;
+
+      let user = tx_context::sender(ctx);
+      assert!(&user == &owner, ENotOrderOwner);
 
       object::delete(id);
       option::destroy_none(target_token_id);
