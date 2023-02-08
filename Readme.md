@@ -20,3 +20,6 @@ Movebarter是一个基于SUI的物品交换平台，用户可以在该平台上�
 ## 编译发布
 sui move build
 sui client publish . --gas-budget 300000
+
+## 测试
+sui move test
