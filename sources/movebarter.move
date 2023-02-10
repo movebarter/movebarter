@@ -170,6 +170,11 @@ module movebarter::exchangeTest {
     let description = b"monkey for Jay";
     let property_value = b"Hot";
     exchange::mint(name, description, property_value, test_scenario::ctx(scenario));
+    test_scenario::next_tx(scenario, owner);
+    test_scenario::next_tx(scenario, bidder1);
+    let nft = test_scenario::take_from_sender<Nft>(scenario);
+    let raw_nft_id_1 = exchange::get_nft_id(&nft);
+    test_scenario::return_to_sender(scenario, nft);
 
 
     test_scenario::next_tx(scenario, bidder2);
@@ -181,6 +186,7 @@ module movebarter::exchangeTest {
     test_scenario::next_tx(scenario, owner);
     test_scenario::next_tx(scenario, bidder2);
     let nft = test_scenario::take_from_sender<Nft>(scenario);
+    let raw_nft_id_2 = exchange::get_nft_id(&nft);
     let nft_id_2 = option::some( exchange::get_nft_id(&nft));
     test_scenario::return_to_sender(scenario, nft);
 
@@ -210,6 +216,17 @@ module movebarter::exchangeTest {
       test_scenario::return_shared(global_val);
     };
 
+    test_scenario::next_tx(scenario, bidder1);
+    {
+      let nft = test_scenario::take_from_address_by_id<Nft>(scenario, bidder1, raw_nft_id_2);
+      test_scenario::return_to_sender(scenario, nft);
+    };
+
+    test_scenario::next_tx(scenario, bidder2);
+    {
+      let nft = test_scenario::take_from_address_by_id<Nft>(scenario, bidder2, raw_nft_id_1);
+      test_scenario::return_to_sender(scenario, nft);
+    };
     test_scenario::end(scenario_val);
   }
 
