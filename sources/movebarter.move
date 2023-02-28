@@ -1,5 +1,5 @@
 module movebarter::exchange {
-  use std::option::{Self, Option};
+  use std::option::{Option};
   use sui::object::{Self, ID, UID};
   use sui::transfer::{transfer, share_object};
   use sui::tx_context::{Self, TxContext};
@@ -9,6 +9,8 @@ module movebarter::exchange {
   const ENftIdNotMatch: u64 = 1;
   const ENftPropertyNotMatch: u64 = 2;
   const ENotOrderOwner: u64 = 3;
+  const LengthNotMatch: u64 = 4;
+  const NFTSIsNotEmpty: u64 = 5;
 
   // we can get all nfts from one address
   // sui client objects
@@ -23,7 +25,7 @@ module movebarter::exchange {
   struct Order has key, store {
     id: UID,
     base_token: Nft,
-    target_token_id: Option<ID>,
+    target_token_ids: vector<ID>,
     target_property_value: Option<vector<u8>>,
     owner: address,
   }
@@ -63,13 +65,13 @@ module movebarter::exchange {
   public entry fun submit_order(
     global: &mut Global,
     base_token: Nft,
-    target_token_id: Option<ID>,
+    target_token_ids: vector<ID>,
     target_property_value: Option<vector<u8>>,
     ctx: &mut TxContext) {
       let order = Order{
         id: object::new(ctx),
         base_token, 
-        target_token_id, 
+        target_token_ids, 
         target_property_value, 
         owner: tx_context::sender(ctx),
       };
@@ -79,31 +81,56 @@ module movebarter::exchange {
 
   public entry fun take_order(
     global: &mut Global,
-    nft: Nft,
+    nfts: vector<Nft>,
     oid: ID,
     ctx: &mut TxContext
     ) {
-      let Order {id, base_token, target_token_id, target_property_value, owner } = object_table::remove(&mut global.orders, oid);
+      let Order {id, base_token, target_token_ids, target_property_value: _, owner } = object_table::remove(&mut global.orders, oid);
 
-      if (option::is_some(&target_token_id)) {
-        let inter_nft_id = object::uid_to_inner(&nft.id);
-        assert!(option::borrow(&target_token_id) == &inter_nft_id, ENftIdNotMatch);
+      // if (option::is_some(&target_token_id)) {
+      //   let inter_nft_id = object::uid_to_inner(&nft.id);
+      //   assert!(option::borrow(&target_token_id) == &inter_nft_id, ENftIdNotMatch);
+      // };
+
+      // if (option::is_some(&target_property_value)) {
+      //   let inter_nft_property_value = nft.property_value;
+      //   assert!(option::borrow(&target_property_value) == &inter_nft_property_value, ENftPropertyNotMatch);
+      // }; 
+
+      let nfts_len = vector::length(&nfts);
+      let target_token_ids_len = vector::length(&target_token_ids);
+      let i = 0;
+
+      assert!(nfts_len == target_token_ids_len, LengthNotMatch);
+
+      while (i < nfts_len) {
+            let nft = vector::borrow(&nfts, i);
+            let inter_nft_id = object::uid_to_inner(&nft.id);
+
+            let target_token_id = vector::borrow(&target_token_ids, i);
+            assert!(target_token_id == &inter_nft_id, ENftIdNotMatch);
+
+            i = i +1;
       };
-
-      if (option::is_some(&target_property_value)) {
-        let inter_nft_property_value = nft.property_value;
-        assert!(option::borrow(&target_property_value) == &inter_nft_property_value, ENftPropertyNotMatch);
-      }; 
 
       let (rt, i) = vector::index_of(&mut global.oids, &oid);
       if(rt) {
         vector::remove(&mut global.oids, i);
       };
 
-      transfer(nft, owner);
+      let i = 0;
+      while (i < nfts_len) {
+        let nft = vector::pop_back(&mut nfts);
+        transfer(nft, owner);
+        i = i + 1;
+      };
+      
       transfer(base_token, tx_context::sender(ctx));
 
+      assert!(vector::is_empty(&nfts), NFTSIsNotEmpty);
+
       object::delete(id);
+      vector::destroy_empty(nfts);
   }
 
   public entry fun cancel_order(
@@ -111,7 +138,7 @@ module movebarter::exchange {
     oid: ID,
     ctx: &mut TxContext
     ) {
-      let Order {id, base_token, target_token_id: _, target_property_value: _, owner } = object_table::remove(&mut global.orders, oid);
+      let Order {id, base_token, target_token_ids: _, target_property_value: _, owner } = object_table::remove(&mut global.orders, oid);
 
       let user = tx_context::sender(ctx);
       assert!(&user == &owner, ENotOrderOwner);
@@ -150,6 +177,7 @@ module movebarter::exchangeTest {
   use movebarter::exchange::{Self, Nft, Global};
   use std::option::{Self};
   //use sui::object::{Self};
+  use std::vector;
 
   #[test]
   fun test_take_order_exchange() {
@@ -177,6 +205,7 @@ module movebarter::exchangeTest {
     test_scenario::return_to_sender(scenario, nft);
 
 
+    let nfts = vector::empty();
     test_scenario::next_tx(scenario, bidder2);
     let name2 = b"monkey";
     let description2 = b"monkey for Sun";
@@ -185,11 +214,24 @@ module movebarter::exchangeTest {
 
     test_scenario::next_tx(scenario, owner);
     test_scenario::next_tx(scenario, bidder2);
-    let nft = test_scenario::take_from_sender<Nft>(scenario);
-    let raw_nft_id_2 = exchange::get_nft_id(&nft);
-    let nft_id_2 = option::some( exchange::get_nft_id(&nft));
-    test_scenario::return_to_sender(scenario, nft);
+    let nft2 = test_scenario::take_from_sender<Nft>(scenario);
+    let raw_nft_id_2 = exchange::get_nft_id(&nft2);
+    let nft_id_2 = exchange::get_nft_id(&nft2);
+    vector::push_back(&mut nfts, nft2);
 
+
+    test_scenario::next_tx(scenario, bidder2);
+    let name3 = b"kitty";
+    let description3 = b"kitty for crypt";
+    let property_value3 = b"Small";
+    exchange::mint(name3, description3, property_value3, test_scenario::ctx(scenario));
+
+    test_scenario::next_tx(scenario, owner);
+    test_scenario::next_tx(scenario, bidder2);
+    let nft3 = test_scenario::take_from_sender<Nft>(scenario);
+    let raw_nft_id_3 = exchange::get_nft_id(&nft3);
+    let nft_id_3 = exchange::get_nft_id(&nft3);
+    vector::push_back(&mut nfts, nft3);
 
     //test_submit_order
     test_scenario::next_tx(scenario, bidder1);
@@ -199,7 +241,10 @@ module movebarter::exchangeTest {
 
       let nft = test_scenario::take_from_sender<Nft>(scenario);
 
-      exchange::submit_order(global, nft, nft_id_2, option::none(), test_scenario::ctx(scenario));
+      let nft_ids = vector::empty();
+      vector::push_back(&mut nft_ids, nft_id_2);
+      vector::push_back(&mut nft_ids, nft_id_3);
+      exchange::submit_order(global, nft, nft_ids, option::none(), test_scenario::ctx(scenario));
       test_scenario::return_shared(global_val);
     };
 
@@ -209,16 +254,21 @@ module movebarter::exchangeTest {
       let global_val = test_scenario::take_shared<Global>(scenario);
       let global = &mut global_val;
 
-      let nft = test_scenario::take_from_sender<Nft>(scenario);
       let oid = exchange::get_last_order_id(global);
-
-      exchange::take_order(global, nft, oid, test_scenario::ctx(scenario));
+      
+      exchange::take_order(global, nfts, oid, test_scenario::ctx(scenario));
       test_scenario::return_shared(global_val);
     };
 
     test_scenario::next_tx(scenario, bidder1);
     {
       let nft = test_scenario::take_from_address_by_id<Nft>(scenario, bidder1, raw_nft_id_2);
+      test_scenario::return_to_sender(scenario, nft);
+    };
+
+    test_scenario::next_tx(scenario, bidder1);
+    {
+      let nft = test_scenario::take_from_address_by_id<Nft>(scenario, bidder1, raw_nft_id_3);
       test_scenario::return_to_sender(scenario, nft);
     };
 
@@ -260,7 +310,7 @@ module movebarter::exchangeTest {
     test_scenario::next_tx(scenario, owner);
     test_scenario::next_tx(scenario, bidder2);
     let nft = test_scenario::take_from_sender<Nft>(scenario);
-    let nft_id_2 = option::some( exchange::get_nft_id(&nft));
+    let nft_id_2 = exchange::get_nft_id(&nft);
     test_scenario::return_to_sender(scenario, nft);
 
 
@@ -272,7 +322,9 @@ module movebarter::exchangeTest {
 
       let nft = test_scenario::take_from_sender<Nft>(scenario);
 
-      exchange::submit_order(global, nft, nft_id_2, option::none(), test_scenario::ctx(scenario));
+      let nft_ids = vector::empty();
+      vector::push_back(&mut nft_ids, nft_id_2);
+      exchange::submit_order(global, nft, nft_ids, option::none(), test_scenario::ctx(scenario));
       test_scenario::return_shared(global_val);
     };
 
